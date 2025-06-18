@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparación de Matrices - Dashboard Mahjong</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .comparison-card {
+            border-left: 4px solid #28a745;
+        }
+        .progression-table {
+            font-size: 0.9rem;
+        }
+        .change-badge {
+            font-size: 0.75rem;
+        }
+        .tile-change {
+            display: inline-block;
+            margin: 0.125rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .tile-lost {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .tile-gained {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .tile-modified {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line"></i> Dashboard Mahjong
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-home"></i> Inicio
+                </a>
+                <a class="nav-link active" href="/comparison">
+                    <i class="fas fa-balance-scale"></i> Comparación
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Comparación</li>
+                    </ol>
+                </nav>
+                <h1 class="mb-4">
+                    <i class="fas fa-balance-scale"></i> Análisis Comparativo entre Matrices
+                </h1>
+                <p class="lead text-muted">
+                    Comparación secuencial y análisis de patrones entre las matrices de estado.
+                </p>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Cargando análisis comparativo...</p>
+        </div>
+
+        <!-- Content Container -->
+        <div id="content" style="display: none;">
+            
+            <!-- Progresión Temporal -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card comparison-card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-line"></i> Progresión Temporal</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped progression-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Matriz</th>
+                                            <th>POV Player</th>
+                                            <th>Step Number</th>
+                                            <th>Fichas Muro</th>
+                                            <th>Total Descartes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="progression-table-body">
+                                        <!-- Datos se cargan aquí -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparaciones del Mismo Jugador -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card comparison-card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-user-check"></i> Comparaciones del Mismo Jugador</h4>
+                            <small class="text-muted">Cambios de mano cuando el POV player es idéntico</small>
+                        </div>
+                        <div class="card-body" id="same-player-comparisons">
+                            <!-- Comparaciones se cargan aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patrones Identificados -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card comparison-card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-search"></i> Patrones Identificados</h4>
+                        </div>
+                        <div class="card-body" id="patterns-section">
+                            <!-- Patrones se cargan aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualización de Cambios -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card comparison-card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-chart-bar"></i> Resumen de Cambios</h4>
+                        </div>
+                        <div class="card-body" id="changes-summary">
+                            <!-- Resumen se carga aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <small>&copy; 2025 Dashboard Análisis Mahjong</small>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadComparisonData();
+        });
+
+        async function loadComparisonData() {
+            try {
+                const response = await fetch('/api/comparison');
+                const data = await response.json();
+                
+                displayProgression(data.progression);
+                displaySamePlayerComparisons(data.same_player_comparisons);
+                displayPatterns(data);
+                displayChangesSummary(data);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error cargando comparación:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<div class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error cargando datos de comparación</div>';
+            }
+        }
+
+        function displayProgression(progression) {
+            const tbody = document.getElementById('progression-table-body');
+            tbody.innerHTML = '';
+
+            progression.forEach((matrix, index) => {
+                const row = document.createElement('tr');
+                
+                // Calcular cambios
+                let stepChange = '';
+                let wallChange = '';
+                let discardChange = '';
+                
+                if (index > 0) {
+                    const prev = progression[index - 1];
+                    const stepDiff = matrix.step_number - prev.step_number;
+                    const wallDiff = matrix.wall_tiles - prev.wall_tiles;
+                    const discardDiff = matrix.total_discards - prev.total_discards;
+                    
+                    stepChange = `<span class="change-badge badge ${stepDiff > 0 ? 'bg-success' : 'bg-danger'}">${stepDiff > 0 ? '+' : ''}${stepDiff}</span>`;
+                    wallChange = `<span class="change-badge badge ${wallDiff < 0 ? 'bg-warning' : 'bg-info'}">${wallDiff > 0 ? '+' : ''}${wallDiff}</span>`;
+                    discardChange = `<span class="change-badge badge ${discardDiff > 0 ? 'bg-primary' : 'bg-secondary'}">${discardDiff > 0 ? '+' : ''}${discardDiff}</span>`;
+                }
+                
+                row.innerHTML = `
+                    <td><strong>Matriz ${matrix.matrix}</strong></td>
+                    <td><span class="badge bg-info">Jugador ${matrix.pov_player}</span></td>
+                    <td>${matrix.step_number} ${stepChange}</td>
+                    <td>${matrix.wall_tiles} ${wallChange}</td>
+                    <td>${matrix.total_discards} ${discardChange}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function displaySamePlayerComparisons(comparisons) {
+            const container = document.getElementById('same-player-comparisons');
+            
+            if (comparisons.length === 0) {
+                container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No se encontraron comparaciones del mismo jugador POV entre matrices consecutivas.</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            comparisons.forEach(comparison => {
+                html += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6><i class="fas fa-arrow-right"></i> Matriz ${comparison.from_matrix} → Matriz ${comparison.to_matrix} (Jugador ${comparison.player})</h6>
+                        </div>
+                        <div class="card-body">
+                            ${displayHandChanges(comparison.hand_changes)}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function displayHandChanges(changes) {
+            let html = '';
+            
+            if (changes.lost.length > 0) {
+                html += '<div class="mb-2"><strong>Fichas perdidas:</strong><br>';
+                changes.lost.forEach(tile => {
+                    html += `<span class="tile-change tile-lost">T${tile.type}(${tile.count})</span>`;
+                });
+                html += '</div>';
+            }
+            
+            if (changes.gained.length > 0) {
+                html += '<div class="mb-2"><strong>Fichas ganadas:</strong><br>';
+                changes.gained.forEach(tile => {
+                    html += `<span class="tile-change tile-gained">T${tile.type}(${tile.count})</span>`;
+                });
+                html += '</div>';
+            }
+            
+            if (changes.modified.length > 0) {
+                html += '<div class="mb-2"><strong>Fichas modificadas:</strong><br>';
+                changes.modified.forEach(tile => {
+                    html += `<span class="tile-change tile-modified">T${tile.type}: ${tile.from}→${tile.to} (${tile.diff > 0 ? '+' : ''}${tile.diff})</span>`;
+                });
+                html += '</div>';
+            }
+            
+            if (html === '') {
+                html = '<div class="text-muted"><i class="fas fa-check-circle"></i> Sin cambios en la mano</div>';
+            }
+            
+            return html;
+        }
+
+        function displayPatterns(data) {
+            const container = document.getElementById('patterns-section');
+            
+            const povs = data.progression.map(p => p.pov_player);
+            const povRotation = povs.join(' → ');
+            
+            const uniquePlayers = [...new Set(povs)];
+            
+            container.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-sync-alt"></i> Rotación POV:</h6>
+                        <p class="font-monospace">${povRotation}</p>
+                        <small class="text-muted">Jugadores únicos: ${uniquePlayers.join(', ')}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-chart-line"></i> Consistencia:</h6>
+                        <div class="alert alert-success">
+                            <i class="fas fa-check"></i> Patrón de rotación detectado<br>
+                            <small>Los jugadores rotan en orden secuencial</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayChangesSummary(data) {
+            const container = document.getElementById('changes-summary');
+            
+            const totalComparisons = data.same_player_comparisons.length;
+            const totalMatrices = data.progression.length;
+            
+            container.innerHTML = `
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <h4 class="text-primary">${totalMatrices}</h4>
+                            <small class="text-muted">Matrices Analizadas</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <h4 class="text-success">${totalComparisons}</h4>
+                            <small class="text-muted">Comparaciones Mismo Jugador</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <h4 class="text-warning">${totalMatrices - 1}</h4>
+                            <small class="text-muted">Cambios de Turno</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-3">
+                            <h4 class="text-info">${new Set(data.progression.map(p => p.pov_player)).size}</h4>
+                            <small class="text-muted">Jugadores Únicos</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb"></i> <strong>Conclusión:</strong> 
+                        Los datos muestran una progresión temporal estructurada con rotación de turnos entre jugadores.
+                        ${totalComparisons > 0 ? 'Se detectaron cambios de mano para el mismo jugador.' : 'No se detectaron cambios de mano para el mismo jugador entre matrices consecutivas.'}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matriz {{ matrix_id + 1 }} - Dashboard Mahjong</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .tile-chip {
+            display: inline-block;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem;
+            font-size: 0.875rem;
+        }
+        .heatmap-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section-card {
+            border-left: 4px solid #007bff;
+        }
+        .player-section {
+            border-left-color: #28a745;
+        }
+        .metadata-section {
+            border-left-color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line"></i> Dashboard Mahjong
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-home"></i> Inicio
+                </a>
+                <a class="nav-link" href="/comparison">
+                    <i class="fas fa-balance-scale"></i> Comparación
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Matriz {{ matrix_id + 1 }}</li>
+                    </ol>
+                </nav>
+                <h1 class="mb-4">
+                    <i class="fas fa-table"></i> Análisis Detallado - Matriz {{ matrix_id + 1 }}
+                </h1>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Cargando análisis detallado...</p>
+        </div>
+
+        <!-- Content Container -->
+        <div id="content" style="display: none;">
+            
+            <!-- Heatmap Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4><i class="fas fa-fire"></i> Heatmap de la Matriz</h4>
+                        </div>
+                        <div class="card-body text-center">
+                            <div id="heatmap-container">
+                                <i class="fas fa-spinner fa-spin"></i> Generando heatmap...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metadata Section -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card section-card metadata-section h-100">
+                        <div class="card-header">
+                            <h5><i class="fas fa-info-circle"></i> Metadata del Juego</h5>
+                        </div>
+                        <div class="card-body" id="metadata-content">
+                            <!-- Metadata se carga aquí -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card section-card h-100">
+                        <div class="card-header">
+                            <h5><i class="fas fa-hand-paper"></i> Composición de Mano</h5>
+                        </div>
+                        <div class="card-body" id="hand-content">
+                            <!-- Mano se carga aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Discards Section -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card section-card player-section">
+                        <div class="card-header">
+                            <h5><i class="fas fa-trash-alt"></i> Descartes por Jugador</h5>
+                        </div>
+                        <div class="card-body" id="discards-content">
+                            <!-- Descartes se cargan aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-outline-secondary" onclick="navigateMatrix(-1)" id="prev-btn">
+                            <i class="fas fa-arrow-left"></i> Matriz Anterior
+                        </button>
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-home"></i> Volver al Dashboard
+                        </a>
+                        <button class="btn btn-outline-secondary" onclick="navigateMatrix(1)" id="next-btn">
+                            Matriz Siguiente <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <small>&copy; 2025 Dashboard Análisis Mahjong</small>
+        </div>
+    </footer>    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const matrixId = parseInt('{{ matrix_id }}');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMatrixDetail();
+            loadHeatmap();
+        });
+
+        async function loadMatrixDetail() {
+            try {
+                const response = await fetch(`/api/matrix/${matrixId}`);
+                const data = await response.json();
+                
+                displayMetadata(data.metadata);
+                displayHandComposition(data.hand_composition);
+                displayDiscardsByPlayer(data.discards_by_player);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+                // Configurar navegación
+                updateNavigationButtons();
+                
+            } catch (error) {
+                console.error('Error cargando detalle:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<div class="text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error cargando datos</div>';
+            }
+        }
+
+        async function loadHeatmap() {
+            try {
+                const response = await fetch(`/api/heatmap/${matrixId}`);
+                const data = await response.json();
+                
+                if (data.image) {
+                    document.getElementById('heatmap-container').innerHTML = 
+                        `<img src="data:image/png;base64,${data.image}" class="heatmap-img" alt="Heatmap Matriz ${matrixId + 1}">`;
+                }
+            } catch (error) {
+                console.error('Error cargando heatmap:', error);
+                document.getElementById('heatmap-container').innerHTML = 
+                    '<div class="text-danger"><i class="fas fa-exclamation-triangle"></i> Error generando heatmap</div>';
+            }
+        }
+
+        function displayMetadata(metadata) {
+            const winds = ['Este', 'Sur', 'Oeste', 'Norte'];
+            const container = document.getElementById('metadata-content');
+            
+            container.innerHTML = `
+                <div class="row">
+                    <div class="col-6 mb-2">
+                        <strong>Viento de Ronda:</strong><br>
+                        <span class="badge bg-primary">${winds[metadata.round_wind]} (${metadata.round_wind})</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Dealer:</strong><br>
+                        <span class="badge bg-success">Jugador ${metadata.dealer}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>POV Player:</strong><br>
+                        <span class="badge bg-info">Jugador ${metadata.pov_player}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Fichas en Muro:</strong><br>
+                        <span class="badge bg-warning text-dark">${metadata.wall_tiles}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Step Number:</strong><br>
+                        <span class="badge bg-secondary">${metadata.step_number}</span>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <strong>Honba Sticks:</strong><br>
+                        <span class="badge bg-danger">${metadata.honba_sticks}</span>
+                    </div>
+                </div>
+                <hr>
+                <h6>Puntuaciones:</h6>
+                <div class="row">
+                    ${metadata.scores.map((score, i) => 
+                        `<div class="col-3"><strong>J${i}:</strong> ${score}</div>`
+                    ).join('')}
+                </div>
+            `;
+        }
+
+        function displayHandComposition(handComposition) {
+            const container = document.getElementById('hand-content');
+            
+            let handHtml = `
+                <div class="mb-3">
+                    <strong>Total de fichas:</strong> ${handComposition.total_tiles}<br>
+                    <strong>Tipos diferentes:</strong> ${handComposition.unique_types}
+                </div>
+                <h6>Composición:</h6>
+                <div class="tile-container">
+            `;
+            
+            handComposition.tiles_detail.forEach(tile => {
+                handHtml += `<span class="tile-chip">T${tile.type} (${tile.count})</span>`;
+            });
+            
+            handHtml += '</div>';
+            container.innerHTML = handHtml;
+        }
+
+        function displayDiscardsByPlayer(discardsByPlayer) {
+            const container = document.getElementById('discards-content');
+            const playerNames = ['POV player', 'Derecha', 'Frente', 'Izquierda'];
+            
+            let discardsHtml = '<div class="row">';
+            
+            discardsByPlayer.forEach((playerDiscards, index) => {
+                discardsHtml += `
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <h6>${playerNames[index]}:</h6>
+                        <div class="border rounded p-2">
+                `;
+                
+                if (playerDiscards.length > 0) {
+                    playerDiscards.forEach(discard => {
+                        discardsHtml += `<span class="tile-chip">T${discard.type} (${discard.count})</span>`;
+                    });
+                } else {
+                    discardsHtml += '<small class="text-muted">Sin descartes</small>';
+                }
+                
+                discardsHtml += '</div></div>';
+            });
+            
+            discardsHtml += '</div>';
+            container.innerHTML = discardsHtml;
+        }
+
+        function updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            
+            if (matrixId <= 0) {
+                prevBtn.disabled = true;
+            }
+            
+            if (matrixId >= 4) { // Asumiendo 5 matrices (0-4)
+                nextBtn.disabled = true;
+            }
+        }
+
+        function navigateMatrix(direction) {
+            const newMatrixId = matrixId + direction;
+            if (newMatrixId >= 0 && newMatrixId < 5) {
+                window.location.href = `/matrix/${newMatrixId}`;
+            }
+        }
+    </script>
+</body>
+</html>
