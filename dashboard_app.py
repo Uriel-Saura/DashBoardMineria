@@ -2,7 +2,7 @@
 Dashboard Web para Análisis de Matrices de Mahjong
 """
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
 import os
 import json
 import base64
@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use('Agg')  # Backend no interactivo para web
 import seaborn as sns
 import numpy as np
+from scipy.sparse import csr_matrix
 
 # Importar nuestros módulos de análisis
 from config import CONFIG, SYMBOLS
@@ -21,42 +22,65 @@ from maps import generate_mahjong_heatmap
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mahjong-dashboard-secret-key'
+app.config['DATA_FOLDER'] = CONFIG['data_folder']
 
 class MahjongDashboard:
     """Clase principal del dashboard"""
     def __init__(self):
+        self.matrix_file = None
         self.matrix = None
         self.analyzers = []
         self.summaries = []
-        self.matrices_data = []  # Inicializar como lista vacía
-        self.load_data()
+        self.matrices_data = []
     
-    def load_data(self):
-        """Carga los datos de las matrices"""
+    def load_data(self, filename):
+        """Carga y procesa los datos de un archivo de matriz .npz"""
+        filepath = os.path.join(app.config['DATA_FOLDER'], filename)
+        if not os.path.exists(filepath):
+            print(f"Error: El archivo {filename} no existe.")
+            return False
+        
         try:
-            self.matrix = np.load(CONFIG['archivo_matriz'])
+            self.matrix_file = filename
+            
+            # Cargar el archivo .npz que contiene la matriz dispersa
+            with np.load(filepath) as npz:
+                # Reconstruir la matriz densa desde el formato disperso CSR
+                matrix = csr_matrix((npz['data'], npz['indices'], npz['indptr']), shape=npz['shape']).toarray()
+
+            # Quitar el elemento 510 de cada matriz (fila) si existe
+            if matrix.shape[1] > 510:
+                matrix = np.delete(matrix, 510, axis=1)
+            
+            self.matrix = matrix
             self.analyze_matrices()
+            return True
         except Exception as e:
-            print(f"Error cargando datos: {e}")
+            print(f"Error cargando y procesando datos de {filename}: {e}")
+            self.matrix_file = None
+            self.matrix = None
+            return False
     
     def analyze_matrices(self):
-        """Analiza todas las matrices"""
+        """Analiza todas las matrices del archivo cargado"""
         self.analyzers = []
         self.summaries = []
-        
+        self.matrices_data = []
+
+        if self.matrix is None:
+            return
+
         for i in range(self.matrix.shape[0]):
             vector = self.matrix[i]
             analyzer = MatrixAnalyzer(vector, i)
             self.analyzers.append(analyzer)
             self.summaries.append(analyzer.get_summary())
         
-        # Almacenar las matrices reformateadas como en test.py
-        self.matrices_data = []
         for i in range(self.matrix.shape[0]):
-            single_row = self.matrix[i]  # Obtener fila individual (510 elementos)
-            single_matrix = single_row.reshape(15, 34)  # Reformatear a matriz 2D de 15x34
+            single_row = self.matrix[i]
+            single_matrix = single_row.reshape(15, 34)
             self.matrices_data.append(single_matrix)
-    
+
     def generate_heatmap_image(self, matrix_index, color="black"):
         """Genera imagen del heatmap para una matriz específica"""
         try:
@@ -97,18 +121,20 @@ class MahjongDashboard:
         summary = self.summaries[matrix_index]
         
         # Convertir la composición de la mano al formato esperado por el frontend
-        hand_data = dict(analyzer.parser.hand)
+        parsed_hand = analyzer.parser.hand
         hand_composition = {
-            'total_tiles': sum(hand_data.values()),
-            'unique_types': len(hand_data),
-            'tiles_detail': [{'type': k, 'count': v} for k, v in sorted(hand_data.items())]
+            'total_tiles': parsed_hand['total_tiles'],
+            'unique_types': parsed_hand['unique_types'],
+            'tiles_detail': [{'type': k, 'count': v} for k, v in sorted(parsed_hand['tiles'])]
         }
         
         # Convertir los descartes al formato esperado por el frontend
         discards_by_player = []
-        for player_discards in analyzer.parser.discards:
+        # itera de 0 a 3 para asegurar el orden de los jugadores
+        for i in range(4):
+            player_discards_data = analyzer.parser.discards[i]
             discards_by_player.append(
-                [{'type': discard[0], 'count': discard[1]} for discard in player_discards]
+                [{'type': discard_type, 'count': count} for discard_type, count in player_discards_data['tiles']]
             )
 
         return {
@@ -197,11 +223,29 @@ def index():
     """Página principal del dashboard"""
     return render_template('index.html')
 
+@app.route('/api/datasets')
+def api_datasets():
+    """API: Lista de datasets NPZ disponibles en la carpeta de datos."""
+    try:
+        files = [f for f in os.listdir(app.config['DATA_FOLDER']) 
+                 if f.endswith('.npz')]
+        return jsonify(sorted(files))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/matrices')
 def api_matrices():
-    """API: Lista de matrices disponibles"""
+    """API: Lista de matrices disponibles para un dataset"""
+    dataset_name = request.args.get('dataset')
+    if not dataset_name:
+        return jsonify({'error': 'Dataset no especificado'}), 400
+
+    # Cargar datos si no es el actual o si no hay ninguno cargado
+    if dashboard.matrix_file != dataset_name:
+        if not dashboard.load_data(dataset_name):
+            return jsonify({'error': f'No se pudo cargar el dataset {dataset_name}'}), 500
+
     matrices_info = []
-    
     for i in range(len(dashboard.summaries)):
         summary = dashboard.summaries[i]
         matrices_info.append({
@@ -210,7 +254,7 @@ def api_matrices():
             'pov_player': int(summary['pov_player']),
             'step_number': int(summary['step_number']),
             'wall_tiles': int(summary['wall_tiles']),
-            'hand_size': int(summary['hand_tiles'])  # Convertir a int nativo
+            'hand_size': int(summary['hand_tiles'])
         })
     
     return jsonify(matrices_info)
@@ -259,7 +303,8 @@ def api_comparison():
     if comparison is None:
         return jsonify({'error': 'No hay suficientes datos para comparación'}), 400
     
-    return jsonify(comparison)
+    comparison_clean = _convert_np(comparison)
+    return jsonify(comparison_clean)
 
 @app.route('/matrix/<int:matrix_id>')
 def matrix_detail(matrix_id):

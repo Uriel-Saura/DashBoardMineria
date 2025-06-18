@@ -35,6 +35,9 @@
         .navbar-brand {
             font-weight: bold;
         }
+        .dataset-selector {
+            max-width: 400px;
+        }
     </style>
 </head>
 <body>
@@ -55,19 +58,18 @@
     </nav>
 
     <div class="container mt-4">
-        <div class="row">
-            <div class="col-12">
-                <h1 class="mb-4">
-                    <i class="fas fa-table"></i> Análisis de Matrices de Mahjong
-                </h1>
-                <p class="lead text-muted">
-                    Dashboard interactivo para visualizar y analizar las primeras 5 matrices de estados de juego.
-                </p>
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-0"><i class="fas fa-table"></i> Análisis de Mahjong</h1>
+            </div>
+            <div class="col-md-4">
+                <select id="dataset-selector" class="form-select">
+                    <option selected>Seleccionar un dataset...</option>
+                </select>
             </div>
         </div>
 
-        <!-- Resumen General -->
-        <div class="row mb-4">
+        <div class="row">
             <div class="col-12">
                 <div class="card border-primary">
                     <div class="card-header bg-primary text-white">
@@ -106,9 +108,8 @@
 
         <div class="row" id="matrices-grid">
             <!-- Las matrices se cargarán aquí dinámicamente -->
-            <div class="col-12 loading">
-                <i class="fas fa-spinner fa-spin fa-2x"></i>
-                <p class="mt-2">Cargando matrices...</p>
+            <div class="col-12 text-center" id="matrices-placeholder">
+                <p class="text-muted">Por favor, seleccione un dataset para comenzar.</p>
             </div>
         </div>
 
@@ -132,23 +133,48 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Cargar datos al iniciar la página
         document.addEventListener('DOMContentLoaded', function() {
-            loadMatrices();
+            loadDatasets();
+            document.getElementById('dataset-selector').addEventListener('change', (event) => {
+                const selectedDataset = event.target.value;
+                if (selectedDataset) {
+                    loadMatrices(selectedDataset);
+                }
+            });
         });
 
-        async function loadMatrices() {
+        async function loadDatasets() {
             try {
-                const response = await fetch('/api/matrices');
+                const response = await fetch('/api/datasets');
+                const datasets = await response.json();
+                const selector = document.getElementById('dataset-selector');
+                selector.innerHTML = '<option value="">Seleccione un dataset...</option>';
+                datasets.forEach(ds => {
+                    selector.innerHTML += `<option value="${ds}">${ds}</option>`;
+                });
+            } catch (error) {
+                console.error('Error cargando datasets:', error);
+            }
+        }
+
+        async function loadMatrices(dataset) {
+            const grid = document.getElementById('matrices-grid');
+            grid.innerHTML = '<div class="col-12 loading"><i class="fas fa-spinner fa-spin fa-2x"></i><p class="mt-2">Cargando matrices...</p></div>';
+            
+            try {
+                const response = await fetch(`/api/matrices?dataset=${dataset}`);
                 const matrices = await response.json();
                 
+                if (matrices.error) {
+                    throw new Error(matrices.error);
+                }
+
                 displayMatrices(matrices);
                 updateSummary(matrices);
                 
             } catch (error) {
                 console.error('Error cargando matrices:', error);
-                document.getElementById('matrices-grid').innerHTML = 
-                    '<div class="col-12 text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error cargando datos</div>';
+                grid.innerHTML = '<div class="col-12 text-center text-danger"><i class="fas fa-exclamation-triangle"></i> Error: ' + error.message + '</div>';
             }
         }
 

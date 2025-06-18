@@ -3,12 +3,25 @@
 Configuración y constantes para el análisis de vectores de Mahjong
 """
 
+import os
+
+# Directorio base del proyecto
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Carpeta para los datasets
+DATA_FOLDER = os.path.join(BASE_DIR, 'datasets')
+
+# Asegurarse de que la carpeta de 'datasets' existe
+os.makedirs(DATA_FOLDER, exist_ok=True)
+
 # Configuración de análisis
 CONFIG = {
     'num_matrices_analizar': 100,
     'archivo_matriz': 'modified_matrix.npy',
     'mostrar_debug': True,
-    'max_tipos_mostrar': 10
+    'max_tipos_mostrar': 10,
+    'data_folder': DATA_FOLDER,
+    'allowed_extensions': {'npz'}
 }
 
 # Constantes del vector de Mahjong
