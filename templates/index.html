@@ -49,6 +49,9 @@
                 <a class="nav-link" href="/">
                     <i class="fas fa-home"></i> Inicio
                 </a>
+                <a class="nav-link" href="/statistics" id="statistics-link" style="display: none;">
+                    <i class="fas fa-chart-pie"></i> Estadísticas
+                </a>
             </div>
         </div>
     </nav>
@@ -232,6 +235,14 @@
             const walls = matrices.map(m => m.wall_tiles);
             const wallRange = `${Math.min(...walls)} - ${Math.max(...walls)}`;
             document.getElementById('wall-range').textContent = wallRange;
+            
+            // Mostrar enlace de estadísticas cuando hay datos cargados
+            const statsLink = document.getElementById('statistics-link');
+            if (matrices.length > 0) {
+                statsLink.style.display = 'block';
+            } else {
+                statsLink.style.display = 'none';
+            }
         }
 
         function showMatrixDetail(matrixId) {

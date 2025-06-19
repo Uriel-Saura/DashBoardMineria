@@ -32,7 +32,56 @@ class MahjongDashboard:
         self.analyzers = []
         self.summaries = []
         self.matrices_data = []
+        
+        # Mapeo de números de fichas a nombres descriptivos
+        self.tile_names = {
+            # Man (Caracteres)
+            0: "1-man", 1: "2-man", 2: "3-man", 3: "4-man", 4: "5-man", 
+            5: "6-man", 6: "7-man", 7: "8-man", 8: "9-man",
+            # Pin (Círculos) 
+            9: "1-pin", 10: "2-pin", 11: "3-pin", 12: "4-pin", 13: "5-pin",
+            14: "6-pin", 15: "7-pin", 16: "8-pin", 17: "9-pin",
+            # Sou (Bambús)
+            18: "1-sou", 19: "2-sou", 20: "3-sou", 21: "4-sou", 22: "5-sou",
+            23: "6-sou", 24: "7-sou", 25: "8-sou", 26: "9-sou",
+            # Vientos y Dragones
+            27: "Este", 28: "Sur", 29: "Oeste", 30: "Norte",
+            31: "Blanco", 32: "Verde", 33: "Rojo"
+        }
     
+    def _get_tile_name(self, tile_number):
+        """Obtiene el nombre descriptivo de una ficha"""
+        return self.tile_names.get(tile_number, f"T{tile_number}")
+    
+    def _is_sequence_possible(self, tile_list):
+        """Verifica si un conjunto de fichas puede formar una secuencia (CHII)"""
+        # Solo se pueden formar secuencias con fichas numeradas (man, pin, sou)
+        # Vientos y dragones no pueden formar secuencias
+        numeric_tiles = []
+        for tile_type, count in tile_list:
+            if tile_type < 27:  # Solo fichas numeradas (0-26)
+                numeric_tiles.extend([tile_type] * count)
+        
+        if len(numeric_tiles) < 3:
+            return False
+            
+        # Verificar si hay secuencias consecutivas del mismo palo
+        numeric_tiles.sort()
+        sequences = []
+        
+        i = 0
+        while i < len(numeric_tiles) - 2:
+            # Verificar secuencia de 3 fichas consecutivas del mismo palo
+            if (numeric_tiles[i+1] == numeric_tiles[i] + 1 and 
+                numeric_tiles[i+2] == numeric_tiles[i] + 2 and
+                numeric_tiles[i] // 9 == numeric_tiles[i+1] // 9 == numeric_tiles[i+2] // 9):
+                sequences.append((numeric_tiles[i], numeric_tiles[i+1], numeric_tiles[i+2]))
+                i += 3
+            else:
+                i += 1
+                
+        return len(sequences) > 0
+
     def load_data(self, filename):
         """Carga y procesa los datos de un archivo de matriz .npz"""
         filepath = os.path.join(app.config['DATA_FOLDER'], filename)
@@ -201,11 +250,123 @@ class MahjongDashboard:
                             'to_matrix': i + 2,
                             'player': player_id,
                             'new_melds': newly_formed_melds
-                        })
-        
+                        })        
         return comparison_data
-
-# Instancia global del dashboard
+    
+    def get_general_statistics(self):
+        """Obtiene estadísticas generales de todas las matrices"""
+        if not self.summaries:
+            return None
+        
+        # Contadores para estadísticas
+        discarded_tiles = {}
+        pon_melds = {}
+        chii_melds = {}
+        kan_melds = {}
+        total_games = len(self.summaries)
+        
+        try:            # Procesar cada matriz para recopilar estadísticas
+            for matrix_idx, analyzer in enumerate(self.analyzers):                # Contar descartes por tipo de ficha
+                try:
+                    for player_id in range(4):
+                        player_discards = analyzer.parser.discards[player_id]
+                        for tile_type, count in player_discards['tiles']:
+                            # Solo contar valores positivos
+                            if count > 0:
+                                tile_name = self._get_tile_name(tile_type)
+                                # Convertir 'count' a int de Python para prevenir overflow
+                                discarded_tiles[tile_name] = discarded_tiles.get(tile_name, 0) + int(count)
+                except (KeyError, IndexError, TypeError) as e:
+                    continue# Contar melds por tipo
+                try:
+                    for player_id in range(4):
+                        player_melds_data = analyzer.parser.melds.get(player_id, {'tiles': []})
+                          # Analizar todos los melds del jugador para clasificarlos correctamente
+                        all_tiles = player_melds_data['tiles']
+                        
+                        for tile_type, count in all_tiles:
+                            tile_name = self._get_tile_name(tile_type)
+                            
+                            if count == 4:
+                                # KAN: 4 fichas iguales
+                                meld_key = f"KAN de {tile_name}"
+                                if meld_key not in kan_melds:
+                                    kan_melds[meld_key] = {'count': 0, 'matrices': []}
+                                kan_melds[meld_key]['count'] += 1
+                                kan_melds[meld_key]['matrices'].append(matrix_idx + 1)
+                            elif count == 3:
+                                # PON: 3 fichas iguales
+                                meld_key = f"PON de {tile_name}"
+                                if meld_key not in pon_melds:
+                                    pon_melds[meld_key] = {'count': 0, 'matrices': []}
+                                pon_melds[meld_key]['count'] += 1
+                                pon_melds[meld_key]['matrices'].append(matrix_idx + 1)
+                            elif count == 1:
+                                # Fichas individuales - podrían ser parte de CHII
+                                meld_key = f"Ficha {tile_name} en meld"
+                                if meld_key not in chii_melds:
+                                    chii_melds[meld_key] = {'count': 0, 'matrices': []}
+                                chii_melds[meld_key]['count'] += 1
+                                chii_melds[meld_key]['matrices'].append(matrix_idx + 1)
+                            elif count == 2:
+                                # Par - no es un meld completo en Mahjong estándar, pero podría ser útil
+                                meld_key = f"Par de {tile_name}"
+                                if meld_key not in pon_melds:
+                                    pon_melds[meld_key] = {'count': 0, 'matrices': []}
+                                pon_melds[meld_key]['count'] += 1
+                                pon_melds[meld_key]['matrices'].append(matrix_idx + 1)
+                            else:                                # Cualquier otra cantidad inusual
+                                meld_key = f"{count}x {tile_name}"
+                                if meld_key not in pon_melds:
+                                    pon_melds[meld_key] = {'count': 0, 'matrices': []}
+                                pon_melds[meld_key]['count'] += 1
+                                pon_melds[meld_key]['matrices'].append(matrix_idx + 1)
+                except (KeyError, IndexError, TypeError) as e:
+                    continue
+            
+            # Ordenar y obtener los más comunes
+            most_discarded = sorted(discarded_tiles.items(), key=lambda x: x[1], reverse=True)[:10]
+            most_common_pon = sorted(pon_melds.items(), key=lambda x: x[1]['count'], reverse=True)[:5]
+            most_common_chii = sorted(chii_melds.items(), key=lambda x: x[1]['count'], reverse=True)[:5]
+            most_common_kan = sorted(kan_melds.items(), key=lambda x: x[1]['count'], reverse=True)[:5]            # Calcular promedios
+            total_discards = sum(discarded_tiles.values())
+            total_melds = sum(data['count'] for data in pon_melds.values()) + sum(data['count'] for data in chii_melds.values()) + sum(data['count'] for data in kan_melds.values())
+            
+            # Asegurar que los valores sean válidos
+            total_discards = max(0, total_discards)
+            total_melds = max(0, total_melds)
+            
+            return {
+                'total_games': total_games,
+                'total_discards': total_discards,
+                'total_melds': total_melds,
+                'average_discards_per_game': round(total_discards / total_games, 2) if total_games > 0 else 0,
+                'average_melds_per_game': round(total_melds / total_games, 2) if total_games > 0 else 0,
+                'most_discarded_tiles': [{'tile': tile, 'count': count, 'percentage': round((count/total_discards)*100, 2) if total_discards > 0 else 0} for tile, count in most_discarded],
+                'most_common_pon': [{'meld': meld, 'count': data['count'], 'matrices': data['matrices'][:5]} for meld, data in most_common_pon],
+                'most_common_chii': [{'meld': meld, 'count': data['count'], 'matrices': data['matrices'][:5]} for meld, data in most_common_chii],
+                'most_common_kan': [{'meld': meld, 'count': data['count'], 'matrices': data['matrices'][:5]} for meld, data in most_common_kan],
+                'meld_distribution': {
+                    'pon': sum(data['count'] for data in pon_melds.values()),
+                    'chii': sum(data['count'] for data in chii_melds.values()),
+                    'kan': sum(data['count'] for data in kan_melds.values())
+                }
+            }
+        except Exception as e:
+            print(f"Error calculando estadísticas generales: {e}")
+            return {
+                'total_games': total_games,
+                'total_discards': 0,
+                'total_melds': 0,
+                'average_discards_per_game': 0,
+                'average_melds_per_game': 0,
+                'most_discarded_tiles': [],
+                'most_common_pon': [],
+                'most_common_chii': [],
+                'most_common_kan': [],
+                'meld_distribution': {'pon': 0, 'chii': 0, 'kan': 0}
+            }
+  # Instancia global del dashboard
 dashboard = MahjongDashboard()
 
 @app.route('/')
@@ -295,6 +456,27 @@ def api_comparison():
     
     comparison_clean = _convert_np(comparison)
     return jsonify(comparison_clean)
+
+@app.route('/api/statistics')
+def api_statistics():
+    """API: Estadísticas generales del dataset actual"""
+    if not dashboard.summaries:
+        return jsonify({'error': 'No hay datos cargados'}), 400
+    
+    statistics = dashboard.get_general_statistics()
+    if statistics is None:
+        return jsonify({'error': 'Error calculando estadísticas'}), 500
+    
+    statistics_clean = _convert_np(statistics)
+    return jsonify(statistics_clean)
+
+@app.route('/statistics')
+def statistics_page():
+    """Página de estadísticas generales"""
+    if not dashboard.summaries:
+        return redirect(url_for('index'))
+    
+    return render_template('statistics.html')
 
 @app.route('/matrix/<int:matrix_id>')
 def matrix_detail(matrix_id):
