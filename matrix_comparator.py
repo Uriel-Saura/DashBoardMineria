@@ -85,7 +85,6 @@ class MatrixComparator:
             print("-" * 60)
             
             self._analyze_metadata_changes(current, next_matrix)
-            self._analyze_hand_changes(current, next_matrix, i+1, i+2)
             self._analyze_discard_changes(current, next_matrix)
             self._analyze_turn_pattern(current, next_matrix, i+1, i+2)
             
@@ -105,53 +104,6 @@ class MatrixComparator:
         # Wall tiles
         wall_diff = next_matrix['wall_tiles'] - current['wall_tiles']
         print(f"   {SYMBOLS['MURO']} Fichas muro: {current['wall_tiles']} → {next_matrix['wall_tiles']} (Δ: {wall_diff:+d})")
-    
-    def _analyze_hand_changes(self, current, next_matrix, current_num, next_num):
-        """Analiza cambios en la mano POV solo cuando el jugador es el mismo"""
-        
-        # Solo analizar si es el mismo jugador
-        if current['pov_player'] != next_matrix['pov_player']:
-            return
-        
-        print(f"\n{SYMBOLS['MANO']} CAMBIOS EN MANO POV:")
-        print(f"   👤 Mismo POV (Jugador {current['pov_player']}): Analizando evolución de mano...")
-        
-        # Convertir manos a diccionarios para facilitar comparación
-        current_hand = dict(current['hand_detail'])
-        next_hand = dict(next_matrix['hand_detail'])
-        
-        # Encontrar todos los tipos únicos
-        all_types = set(current_hand.keys()) | set(next_hand.keys())
-        
-        changes_found = False
-        lost_tiles = []
-        gained_tiles = []
-        modified_tiles = []
-        
-        for tile_type in sorted(all_types):
-            current_count = current_hand.get(tile_type, 0)
-            next_count = next_hand.get(tile_type, 0)
-            
-            if current_count != next_count:
-                changes_found = True
-                diff = next_count - current_count
-                
-                if current_count > 0 and next_count == 0:
-                    lost_tiles.append(f"T{tile_type}({current_count})")
-                elif current_count == 0 and next_count > 0:
-                    gained_tiles.append(f"T{tile_type}({next_count})")
-                else:
-                    modified_tiles.append(f"T{tile_type}: {current_count}→{next_count} (Δ{diff:+d})")
-        
-        if not changes_found:
-            print(f"   {SYMBOLS['EXITO']} Sin cambios en la mano POV (mismo jugador)")
-        else:
-            if lost_tiles:
-                print(f"   {SYMBOLS['PERDIDA']} Fichas perdidas: {', '.join(lost_tiles)}")
-            if gained_tiles:
-                print(f"   {SYMBOLS['GANANCIA']} Fichas ganadas: {', '.join(gained_tiles)}")
-            if modified_tiles:
-                print(f"   {SYMBOLS['MODIFICACION']} Fichas modificadas: {', '.join(modified_tiles)}")
     
     def _analyze_discard_changes(self, current, next_matrix):
         """Analiza cambios en descartes"""

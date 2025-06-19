@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Matriz {{ matrix_id + 1 }} - Dashboard Mahjong</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">    <style>
         .tile-chip {
             display: inline-block;
             background: #f8f9fa;
@@ -15,6 +14,32 @@
             padding: 0.25rem 0.5rem;
             margin: 0.125rem;
             font-size: 0.875rem;
+        }        .mahjong-tile {
+            display: inline-block;
+            margin: 2px;
+            transition: transform 0.2s;
+        }
+        .mahjong-tile:hover {
+            transform: scale(1.1);
+        }
+        .tile-count {
+            font-size: 12px;
+            background: #007bff;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            margin-left: 4px;
+            vertical-align: top;
+        }
+        .mahjong-tiles-container {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: flex-start;
         }
         .heatmap-img {
             max-width: 100%;
@@ -38,13 +63,9 @@
         <div class="container">
             <a class="navbar-brand" href="/">
                 <i class="fas fa-chart-line"></i> Dashboard Mahjong
-            </a>
-            <div class="navbar-nav ms-auto">
+            </a>            <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/">
                     <i class="fas fa-home"></i> Inicio
-                </a>
-                <a class="nav-link" href="/comparison">
-                    <i class="fas fa-balance-scale"></i> Comparación
                 </a>
             </div>
         </div>
@@ -88,12 +109,10 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Metadata Section -->
+            </div>            <!-- Metadata Section -->
             <div class="row mb-4">
-                <div class="col-md-6">
-                    <div class="card section-card metadata-section h-100">
+                <div class="col-md-12">
+                    <div class="card section-card metadata-section">
                         <div class="card-header">
                             <h5><i class="fas fa-info-circle"></i> Metadata del Juego</h5>
                         </div>
@@ -102,6 +121,10 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Hand and Melds Section -->
+            <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card section-card h-100">
                         <div class="card-header">
@@ -109,6 +132,16 @@
                         </div>
                         <div class="card-body" id="hand-content">
                             <!-- Mano se carga aquí -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card section-card h-100">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cubes"></i> Melds por Jugador</h5>
+                        </div>
+                        <div class="card-body" id="melds-content">
+                            <!-- Melds se cargan aquí -->
                         </div>
                     </div>
                 </div>
@@ -154,8 +187,165 @@
     </footer>    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const matrixId = parseInt('{{ matrix_id }}');
+        console.log(`Matrix ID inicializado: ${matrixId}`);
+          // Verificar que matrixId sea válido
+        if (isNaN(matrixId)) {
+            console.error('Matrix ID no es válido:', '{{ matrix_id }}');
+        }
+          // Función para verificar el estado de la aplicación
+        async function checkAppStatus() {
+            try {
+                // Intentar obtener información de las matrices disponibles
+                // Primero obtener la lista de datasets
+                const datasetsResponse = await fetch('/api/datasets');
+                if (!datasetsResponse.ok) {
+                    console.error('Error obteniendo datasets');
+                    return 5; // Fallback a 5 matrices como estaba originalmente
+                }
+                
+                const datasets = await datasetsResponse.json();
+                if (datasets.length === 0) {
+                    console.error('No hay datasets disponibles');
+                    return 5; // Fallback
+                }
+                
+                // Usar el primer dataset para obtener el número de matrices
+                const matricesResponse = await fetch(`/api/matrices?dataset=${datasets[0]}`);
+                if (matricesResponse.ok) {
+                    const matrices = await matricesResponse.json();
+                    console.log(`Estado de la app: ${matrices.length} matrices disponibles`);
+                    return matrices.length;
+                } else {
+                    console.error('Error obteniendo matrices');
+                    return 5; // Fallback
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+                return 5; // Fallback a 5 matrices
+            }
+        }
         
-        document.addEventListener('DOMContentLoaded', function() {
+        // SVG de las fichas de Mahjong
+        const mahjongTilesSVG = `        <svg xmlns="http://www.w3.org/2000/svg" width="280" height="300" viewBox="0 0 280 300" style="display: none;">
+          <defs>
+            <!-- Man (Caracteres) - Negro -->
+            <g id="tile-0">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">一</text> </g>  <!-- 0-man (1-man) -->
+            <g id="tile-1">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">二</text> </g>  <!-- 1-man (2-man) -->
+            <g id="tile-2">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">三</text> </g>  <!-- 2-man (3-man) -->
+            <g id="tile-3">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">四</text> </g>  <!-- 3-man (4-man) -->
+            <g id="tile-4">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">五</text> </g>  <!-- 4-man (5-man) -->
+            <g id="tile-5">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">六</text> </g>  <!-- 5-man (6-man) -->
+            <g id="tile-6">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">七</text> </g>  <!-- 6-man (7-man) -->
+            <g id="tile-7">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">八</text> </g>  <!-- 7-man (8-man) -->
+            <g id="tile-8">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">九</text> </g>  <!-- 8-man (9-man) -->
+            
+            <!-- Pin (Círculos) - Azul -->
+            <g id="tile-9">  <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">一</text> </g>  <!-- 9-pin (1-pin) -->
+            <g id="tile-10"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">二</text> </g>  <!-- 10-pin (2-pin) -->
+            <g id="tile-11"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">三</text> </g>  <!-- 11-pin (3-pin) -->
+            <g id="tile-12"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">四</text> </g>  <!-- 12-pin (4-pin) -->
+            <g id="tile-13"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">五</text> </g>  <!-- 13-pin (5-pin) -->
+            <g id="tile-14"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">六</text> </g>  <!-- 14-pin (6-pin) -->
+            <g id="tile-15"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">七</text> </g>  <!-- 15-pin (7-pin) -->
+            <g id="tile-16"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">八</text> </g>  <!-- 16-pin (8-pin) -->
+            <g id="tile-17"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="blue">九</text> </g>  <!-- 17-pin (9-pin) -->
+            
+            <!-- Sou (Bambúes) - Verde -->
+            <g id="tile-18"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">一</text> </g>  <!-- 18-sou (1-sou) -->
+            <g id="tile-19"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">二</text> </g>  <!-- 19-sou (2-sou) -->
+            <g id="tile-20"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">三</text> </g>  <!-- 20-sou (3-sou) -->
+            <g id="tile-21"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">四</text> </g>  <!-- 21-sou (4-sou) -->
+            <g id="tile-22"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">五</text> </g>  <!-- 22-sou (5-sou) -->
+            <g id="tile-23"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">六</text> </g>  <!-- 23-sou (6-sou) -->
+            <g id="tile-24"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">七</text> </g>  <!-- 24-sou (7-sou) -->
+            <g id="tile-25"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">八</text> </g>  <!-- 25-sou (8-sou) -->
+            <g id="tile-26"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">九</text> </g>  <!-- 26-sou (9-sou) -->
+            
+            <!-- Vientos - Negro -->
+            <g id="tile-27"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">東</text> </g>  <!-- 27-east -->
+            <g id="tile-28"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">南</text> </g>  <!-- 28-south -->
+            <g id="tile-29"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">西</text> </g>  <!-- 29-west -->
+            <g id="tile-30"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="black">北</text> </g>  <!-- 30-north -->
+            
+            <!-- Dragones -->
+            <g id="tile-31"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <rect x="6" y="6" width="28" height="48" rx="2" fill="none" stroke="black"/> </g>  <!-- 31-haku -->
+            <g id="tile-32"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="green">發</text> </g>  <!-- 32-hatsu -->
+            <g id="tile-33"> <rect x="2" y="2" width="36" height="56" rx="5" fill="white" stroke="black" stroke-width="2"/>   <text x="20" y="38" font-size="24" text-anchor="middle" fill="red">中</text> </g>  <!-- 33-chun -->
+          </defs>
+        </svg>`;        // Mapeo de números T a nombres de fichas
+        const tileNames = {
+            0: "1-man", 1: "2-man", 2: "3-man", 3: "4-man", 4: "5-man", 5: "6-man", 6: "7-man", 7: "8-man", 8: "9-man",
+            9: "1-pin", 10: "2-pin", 11: "3-pin", 12: "4-pin", 13: "5-pin", 14: "6-pin", 15: "7-pin", 16: "8-pin", 17: "9-pin",
+            18: "1-sou", 19: "2-sou", 20: "3-sou", 21: "4-sou", 22: "5-sou", 23: "6-sou", 24: "7-sou", 25: "8-sou", 26: "9-sou",
+            27: "Este", 28: "Sur", 29: "Oeste", 30: "Norte",
+            31: "Blanco", 32: "Verde", 33: "Rojo"
+        };
+        
+        // Función para crear una ficha individual
+        function createMahjongTile(tileNumber, count = 1) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "40");
+            svg.setAttribute("height", "60");
+            svg.setAttribute("viewBox", "0 0 40 60");
+            svg.classList.add("mahjong-tile");
+            
+            // Crear una copia del tile específico
+            const use = document.createElementNS(svgNS, "use");
+            use.setAttribute("href", `#tile-${tileNumber}`);
+            svg.appendChild(use);
+            
+            const container = document.createElement("div");
+            container.style.position = "relative";
+            container.style.display = "inline-block";
+            container.style.textAlign = "center";
+            container.style.margin = "5px";
+            
+            container.appendChild(svg);
+            
+            // Agregar el nombre de la ficha debajo
+            const tileName = document.createElement("div");
+            tileName.textContent = tileNames[tileNumber] || `T${tileNumber}`;
+            tileName.style.fontSize = "10px";
+            tileName.style.color = "#666";
+            tileName.style.marginTop = "2px";
+            tileName.style.fontWeight = "500";
+            container.appendChild(tileName);
+            
+            if (count > 1) {
+                const countBadge = document.createElement("span");
+                countBadge.textContent = count;
+                countBadge.classList.add("tile-count");
+                countBadge.style.position = "absolute";
+                countBadge.style.top = "-5px";
+                countBadge.style.right = "-5px";
+                container.appendChild(countBadge);
+            }
+            
+            return container;
+        }
+          document.addEventListener('DOMContentLoaded', function() {
+            // Agregar el SVG de definiciones al DOM
+            document.body.insertAdjacentHTML('beforeend', mahjongTilesSVG);
+            
+            // Configurar event listeners para los botones de navegación
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    navigateMatrix(-1);
+                });
+            }
+            
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    navigateMatrix(1);
+                });
+            }
+            
             loadMatrixDetail();
             loadHeatmap();
         });
@@ -164,9 +354,9 @@
             try {
                 const response = await fetch(`/api/matrix/${matrixId}`);
                 const data = await response.json();
-                
-                displayMetadata(data.metadata);
+                  displayMetadata(data.metadata);
                 displayHandComposition(data.hand_composition);
+                displayMeldsByPlayer(data.melds_by_player);
                 displayDiscardsByPlayer(data.discards_by_player);
                 
                 document.getElementById('loading').style.display = 'none';
@@ -237,9 +427,7 @@
                     ).join('')}
                 </div>
             `;
-        }
-
-        function displayHandComposition(handComposition) {
+        }        function displayHandComposition(handComposition) {
             const container = document.getElementById('hand-content');
             
             let handHtml = `
@@ -247,65 +435,176 @@
                     <strong>Total de fichas:</strong> ${handComposition.total_tiles}<br>
                     <strong>Tipos diferentes:</strong> ${handComposition.unique_types}
                 </div>
-                <h6>Composición:</h6>
-                <div class="tile-container">
+                <h6>Composición de la Mano:</h6>
+                <div class="mahjong-tiles-container" id="hand-tiles">
             `;
             
+            // Primero agregar el HTML básico
+            container.innerHTML = handHtml + '</div>';
+              // Luego agregar las fichas SVG
+            const tilesContainer = document.getElementById('hand-tiles');
             handComposition.tiles_detail.forEach(tile => {
-                handHtml += `<span class="tile-chip">T${tile.type} (${tile.count})</span>`;
+                const tileElement = createMahjongTile(tile.type, tile.count);
+                tileElement.title = `T${tile.type} (${tile.count} fichas)`;
+                tilesContainer.appendChild(tileElement);
             });
-            
-            handHtml += '</div>';
-            container.innerHTML = handHtml;
         }
 
-        function displayDiscardsByPlayer(discardsByPlayer) {
+        function displayMeldsByPlayer(meldsByPlayer) {
+            const container = document.getElementById('melds-content');
+            const playerNames = ['POV player', 'Derecha', 'Frente', 'Izquierda'];
+            
+            let meldsHtml = '<div class="row">';
+            
+            meldsHtml += '</div>';
+            container.innerHTML = meldsHtml;
+            
+            // Crear contenedores para cada jugador
+            const rowContainer = container.querySelector('.row');
+            
+            meldsByPlayer.forEach((playerMelds, index) => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'col-6 mb-3';
+                
+                const playerHeader = document.createElement('h6');
+                playerHeader.className = 'text-primary';
+                playerHeader.textContent = `${playerNames[index]}:`;
+                playerDiv.appendChild(playerHeader);
+                
+                const tilesContainer = document.createElement('div');
+                tilesContainer.className = 'mahjong-tiles-container';
+                tilesContainer.style.minHeight = '80px';
+                tilesContainer.style.background = '#f0f8ff';
+                
+                if (playerMelds.length > 0) {
+                    playerMelds.forEach(meld => {
+                        const tileElement = createMahjongTile(meld.type, meld.count);
+                        tileElement.title = `T${meld.type} (${meld.count} melds)`;
+                        tilesContainer.appendChild(tileElement);
+                    });
+                } else {
+                    const noMelds = document.createElement('small');
+                    noMelds.className = 'text-muted d-flex align-items-center justify-content-center h-100';
+                    noMelds.textContent = 'Sin melds';
+                    tilesContainer.appendChild(noMelds);
+                }
+                
+                playerDiv.appendChild(tilesContainer);
+                rowContainer.appendChild(playerDiv);
+            });
+        }function displayDiscardsByPlayer(discardsByPlayer) {
             const container = document.getElementById('discards-content');
             const playerNames = ['POV player', 'Derecha', 'Frente', 'Izquierda'];
             
             let discardsHtml = '<div class="row">';
             
+            discardsHtml += '</div>';
+            container.innerHTML = discardsHtml;
+            
+            // Crear contenedores para cada jugador
+            const rowContainer = container.querySelector('.row');
+            
             discardsByPlayer.forEach((playerDiscards, index) => {
-                discardsHtml += `
-                    <div class="col-md-6 col-lg-3 mb-3">
-                        <h6>${playerNames[index]}:</h6>
-                        <div class="border rounded p-2">
-                `;
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'col-md-6 col-lg-3 mb-3';
+                
+                const playerHeader = document.createElement('h6');
+                playerHeader.textContent = `${playerNames[index]}:`;
+                playerDiv.appendChild(playerHeader);
+                
+                const tilesContainer = document.createElement('div');
+                tilesContainer.className = 'mahjong-tiles-container';
+                tilesContainer.style.minHeight = '80px';
                 
                 if (playerDiscards.length > 0) {
                     playerDiscards.forEach(discard => {
-                        discardsHtml += `<span class="tile-chip">T${discard.type} (${discard.count})</span>`;
+                        const tileElement = createMahjongTile(discard.type, discard.count);
+                        tileElement.title = `T${discard.type} (${discard.count} descartes)`;
+                        tilesContainer.appendChild(tileElement);
                     });
                 } else {
-                    discardsHtml += '<small class="text-muted">Sin descartes</small>';
+                    const noDiscards = document.createElement('small');
+                    noDiscards.className = 'text-muted d-flex align-items-center justify-content-center h-100';
+                    noDiscards.textContent = 'Sin descartes';
+                    tilesContainer.appendChild(noDiscards);
                 }
                 
-                discardsHtml += '</div></div>';
-            });
-            
-            discardsHtml += '</div>';
-            container.innerHTML = discardsHtml;
-        }
-
-        function updateNavigationButtons() {
+                playerDiv.appendChild(tilesContainer);
+                rowContainer.appendChild(playerDiv);
+            });        }        async function updateNavigationButtons() {
             const prevBtn = document.getElementById('prev-btn');
             const nextBtn = document.getElementById('next-btn');
             
-            if (matrixId <= 0) {
-                prevBtn.disabled = true;
+            console.log(`Actualizando botones de navegación: matrixId=${matrixId}`);
+            
+            // Intentar obtener el número real de matrices, con fallback a 5
+            let totalMatrices = 5; // Valor por defecto
+            try {
+                totalMatrices = await checkAppStatus();
+                console.log(`Total matrices disponibles: ${totalMatrices}`);
+            } catch (error) {
+                console.log(`Usando valor por defecto: ${totalMatrices} matrices`);
             }
             
-            if (matrixId >= 4) { // Asumiendo 5 matrices (0-4)
-                nextBtn.disabled = true;
+            if (prevBtn) {
+                if (matrixId <= 0) {
+                    prevBtn.disabled = true;
+                    console.log('Botón anterior deshabilitado');
+                } else {
+                    prevBtn.disabled = false;
+                    console.log('Botón anterior habilitado');
+                }
             }
-        }
-
-        function navigateMatrix(direction) {
+            
+            if (nextBtn) {
+                if (matrixId >= totalMatrices - 1) {
+                    nextBtn.disabled = true;
+                    console.log('Botón siguiente deshabilitado');
+                } else {
+                    nextBtn.disabled = false;
+                    console.log('Botón siguiente habilitado');
+                }
+            }
+        }function navigateMatrix(direction) {
+            console.log(`Navegando: dirección=${direction}, matrixId actual=${matrixId}`);
             const newMatrixId = matrixId + direction;
+            console.log(`Nuevo matrixId: ${newMatrixId}`);
+            
+            // Usar verificación simple de rango
             if (newMatrixId >= 0 && newMatrixId < 5) {
-                window.location.href = `/matrix/${newMatrixId}`;
+                const newUrl = `/matrix/${newMatrixId}`;
+                console.log(`Navegando a URL: ${newUrl}`);
+                
+                // Navegar directamente
+                try {
+                    console.log(`Cambiando ubicación a: ${newUrl}`);
+                    window.location.href = newUrl;
+                } catch (error) {
+                    console.error('Error en navegación:', error);
+                    // Método de respaldo
+                    window.location.replace(newUrl);
+                }
+                
+            } else {
+                console.log(`Navegación fuera de rango: ${newMatrixId}`);
+                console.log(`Rango válido: 0-4`);
             }
         }
+        
+        // Función para verificar si una matriz existe
+        async function checkMatrixExists(matrixId) {
+            try {
+                const response = await fetch(`/api/matrix/${matrixId}`);
+                return response.ok;
+            } catch (error) {
+                console.error('Error verificando matriz:', error);
+                return false;
+            }
+        }
+        
+        // Hacer las funciones globales para que funcionen con onclick
+        window.navigateMatrix = navigateMatrix;
+        window.updateNavigationButtons = updateNavigationButtons;
     </script>
 </body>
 </html>

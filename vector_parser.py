@@ -116,7 +116,8 @@ class MahjongVectorParser:
             'hand_tiles': self.hand['total_tiles'],
             'hand_detail': self.hand['tiles'],
             'discards_detail': {i: data['tiles'] for i, data in self.discards.items()},
-            'pond_detail': {i: data['tiles'] for i, data in self.pond.items()}
+            'pond_detail': {i: data['tiles'] for i, data in self.pond.items()},
+            'melds_detail': {i: data['tiles'] for i, data in self.melds.items()}
         }
 
 def tiles_to_string(tiles_list, max_show=None):

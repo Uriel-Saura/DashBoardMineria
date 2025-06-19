@@ -45,13 +45,9 @@
         <div class="container">
             <a class="navbar-brand" href="/">
                 <i class="fas fa-chart-line"></i> Dashboard Mahjong
-            </a>
-            <div class="navbar-nav ms-auto">
+            </a>            <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/">
                     <i class="fas fa-home"></i> Inicio
-                </a>
-                <a class="nav-link" href="/comparison">
-                    <i class="fas fa-balance-scale"></i> Comparación
                 </a>
             </div>
         </div>
@@ -84,10 +80,9 @@
                             <div class="col-md-3">
                                 <h4 class="text-success" id="unique-players">-</h4>
                                 <small class="text-muted">Jugadores Únicos</small>
-                            </div>
-                            <div class="col-md-3">
-                                <h4 class="text-warning" id="step-range">-</h4>
-                                <small class="text-muted">Rango de Steps</small>
+                            </div>                            <div class="col-md-3">
+                                <h4 class="text-warning" id="turns-played">-</h4>
+                                <small class="text-muted">Cambios de Turno  / Turnos jugados</small>
                             </div>
                             <div class="col-md-3">
                                 <h4 class="text-info" id="wall-range">-</h4>
@@ -219,17 +214,20 @@
                 `;
                 grid.appendChild(card);
             });
-        }
-
-        function updateSummary(matrices) {
+        }        function updateSummary(matrices) {
             document.getElementById('total-matrices').textContent = matrices.length;
             
             const uniquePlayers = [...new Set(matrices.map(m => m.pov_player))].length;
             document.getElementById('unique-players').textContent = uniquePlayers;
             
-            const steps = matrices.map(m => m.step_number);
-            const stepRange = `${Math.min(...steps)} a ${Math.max(...steps)}`;
-            document.getElementById('step-range').textContent = stepRange;
+            // Calcular cambios de turnos basado en las transiciones entre matrices
+            let turnChanges = 0;
+            for (let i = 1; i < matrices.length; i++) {
+                if (matrices[i].step_number !== matrices[i-1].step_number) {
+                    turnChanges++;
+                }
+            }
+            document.getElementById('turns-played').textContent = turnChanges;
             
             const walls = matrices.map(m => m.wall_tiles);
             const wallRange = `${Math.min(...walls)} - ${Math.max(...walls)}`;

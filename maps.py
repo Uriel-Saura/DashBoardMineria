@@ -1,6 +1,5 @@
 from matplotlib import pyplot as plt
 import matplotlib.colors
-
 import seaborn as sns
 import numpy as np
 
@@ -43,7 +42,6 @@ LABELS_METADATA = (
     + ["Round Number", "Step Number"]
 )
 
-# Designed to be used with: https://www.kaggle.com/datasets/trongdt/japanese-mahjong-board-states
 KAGGLE_MAHJONG_COLORMAP = {
     "norm": matplotlib.colors.BoundaryNorm([-128, 0, 1, 2, 3, 4, 5, 128], 8),
     "cmap": sns.color_palette(
@@ -135,7 +133,6 @@ def generate_mahjong_heatmap(
     else:
         heatmap_params.update(dict(linewidths=0))
 
-    # Custom colormap tailored to be used with https://www.kaggle.com/datasets/trongdt/japanese-mahjong-board-states
     if colormap == "kaggle_mahjong":
         heatmap_params.update(KAGGLE_MAHJONG_COLORMAP)
 
@@ -162,7 +159,6 @@ def generate_mahjong_heatmap(
 
     if output_path is not None:
         plt.savefig(output_path + ".png", bbox_inches="tight")
-        plt.savefig(output_path + ".svg", bbox_inches="tight")
 
     if show_fig:
         plt.show()

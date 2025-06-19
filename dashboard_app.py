@@ -102,7 +102,7 @@ class MahjongDashboard:
                 show_fig=False
             )
 
-            # Leer la imagen generada y devolverla
+            # Leer la imagen generada e devolverla
             with open(f"{output_path}.png", "rb") as f:
                 img_data = base64.b64encode(f.read()).decode('utf-8')
             
@@ -126,7 +126,18 @@ class MahjongDashboard:
             'total_tiles': parsed_hand['total_tiles'],
             'unique_types': parsed_hand['unique_types'],
             'tiles_detail': [{'type': k, 'count': v} for k, v in sorted(parsed_hand['tiles'])]
-        }
+        }        # Convertir los melds al formato esperado por el frontend
+        melds_by_player = []
+        try:
+            for i in range(4):
+                player_melds_data = analyzer.parser.melds.get(i, {'tiles': []})
+                melds_by_player.append(
+                    [{'type': meld_type, 'count': count} for meld_type, count in player_melds_data['tiles']]
+                )
+        except Exception as e:
+            print(f"Error procesando melds: {e}")
+            # Fallback: crear estructura vacía
+            melds_by_player = [[] for _ in range(4)]
         
         # Convertir los descartes al formato esperado por el frontend
         discards_by_player = []
@@ -142,6 +153,7 @@ class MahjongDashboard:
             'summary': summary,
             'metadata': analyzer.parser.metadata,
             'hand_composition': hand_composition,
+            'melds_by_player': melds_by_player,
             'discards_by_player': discards_by_player
         }
     
@@ -150,13 +162,10 @@ class MahjongDashboard:
         if len(self.summaries) < 2:
             return None
         
-        comparator = MatrixComparator(self.summaries)
-        
         # Generar datos de comparación
         comparison_data = {
             'progression': [],
-            'same_player_comparisons': [],
-            'discard_patterns': {}
+            'meld_changes': []
         }
         
         # Progresión temporal
@@ -168,52 +177,33 @@ class MahjongDashboard:
                 'total_discards': sum(len(discards) for discards in summary['discards_detail'].values())
             })
         
-        # Comparaciones del mismo jugador
+        # Comparaciones de melds
         for i in range(len(self.summaries) - 1):
             current = self.summaries[i]
             next_matrix = self.summaries[i + 1]
             
-            if current['pov_player'] == next_matrix['pov_player']:
-                comparison_data['same_player_comparisons'].append({
-                    'from_matrix': i + 1,
-                    'to_matrix': i + 2,
-                    'player': current['pov_player'],
-                    'hand_changes': self._analyze_hand_changes_data(current, next_matrix)
-                })
+            for player_id in range(4):
+                current_melds = dict(current['melds_detail'].get(player_id, []))
+                next_melds = dict(next_matrix['melds_detail'].get(player_id, []))
+
+                if current_melds != next_melds:
+                    newly_formed_melds = []
+                    for tile_type, count in next_melds.items():
+                        if count > current_melds.get(tile_type, 0):
+                            newly_formed_melds.append({
+                                'type': tile_type,
+                                'count': count - current_melds.get(tile_type, 0)
+                            })
+                    
+                    if newly_formed_melds:
+                        comparison_data['meld_changes'].append({
+                            'from_matrix': i + 1,
+                            'to_matrix': i + 2,
+                            'player': player_id,
+                            'new_melds': newly_formed_melds
+                        })
         
         return comparison_data
-    
-    def _analyze_hand_changes_data(self, current, next_matrix):
-        """Analiza cambios de mano entre matrices para datos JSON"""
-        current_hand = dict(current['hand_detail'])
-        next_hand = dict(next_matrix['hand_detail'])
-        
-        all_types = set(current_hand.keys()) | set(next_hand.keys())
-        
-        changes = {
-            'lost': [],
-            'gained': [],
-            'modified': []
-        }
-        
-        for tile_type in sorted(all_types):
-            current_count = current_hand.get(tile_type, 0)
-            next_count = next_hand.get(tile_type, 0)
-            
-            if current_count != next_count:
-                if current_count > 0 and next_count == 0:
-                    changes['lost'].append({'type': tile_type, 'count': current_count})
-                elif current_count == 0 and next_count > 0:
-                    changes['gained'].append({'type': tile_type, 'count': next_count})
-                else:
-                    changes['modified'].append({
-                        'type': tile_type, 
-                        'from': current_count, 
-                        'to': next_count,
-                        'diff': next_count - current_count
-                    })
-        
-        return changes
 
 # Instancia global del dashboard
 dashboard = MahjongDashboard()
@@ -314,10 +304,10 @@ def matrix_detail(matrix_id):
     
     return render_template('matrix_detail.html', matrix_id=matrix_id)
 
-@app.route('/comparison')
-def comparison():
-    """Página de comparación entre matrices"""
-    return render_template('comparison.html')
+# @app.route('/comparison')
+# def comparison():
+#     """Página de comparación entre matrices"""
+#     return render_template('comparison.html')
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
