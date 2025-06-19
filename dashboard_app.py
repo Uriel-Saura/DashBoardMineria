@@ -138,13 +138,11 @@ class MahjongDashboard:
                 return None
 
             # Obtener la matriz específica
-            matrix_data = self.matrices_data[matrix_index]            # Generar heatmap usando la función de maps.py
+            matrix_data = self.matrices_data[matrix_index]            # Generar heatmap usando la función simplificada de maps.py
             output_path = f"./resources/mahjong_board_{matrix_index + 1}_{color}"
             generate_mahjong_heatmap(
                 input_matrix=matrix_data,
                 title="",  # Título eliminado
-                border_color=color,
-                colormap="kaggle_mahjong",
                 output_path=output_path,
                 show_fig=False
             )
