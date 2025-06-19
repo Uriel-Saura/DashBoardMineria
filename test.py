@@ -41,8 +41,7 @@ num_matrices_to_process = 5  # Procesar solo las primeras 5 para prueba rápida
 
 print(f"Generando heatmaps para las primeras {num_matrices_to_process} matrices...")
 
-for i in range(min(num_matrices_to_process, len(mock_matrix))):
-    # Obtener la fila individual y reformatearla a matriz 2D (15x34)
+for i in range(min(num_matrices_to_process, len(mock_matrix))):    # Obtener la fila individual y reformatearla a matriz 2D (15x34)
     single_row = mock_matrix[i]  # Obtener fila individual (510 elementos)
     single_matrix = single_row.reshape(15, 34)  # Reformatear a matriz 2D de 15x34
     
@@ -51,7 +50,7 @@ for i in range(min(num_matrices_to_process, len(mock_matrix))):
     try:
         generate_mahjong_heatmap(
             input_matrix=single_matrix,
-            title=f"Mahjong Board {i+1} w/ black border",
+            title="",  # Título eliminado
             border_color="black",
             colormap="kaggle_mahjong",  # Custom colormap useful for this use-case
             output_path=f"./resources/mahjong_board_{i+1}_black"

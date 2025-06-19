@@ -71,28 +71,6 @@ def generate_mahjong_heatmap(
     output_path=None,
     show_fig=True,
 ):
-    """Generate a heatmap using the given input matrix.
-
-    Args:
-        input_matrix (np.ndarray): The input 2D array for heatmap generation.
-        labels_left (list[str] | None, optional): Labels for the left side of the heatmap. If None, use default labels. If empty list, no labels are used.. Defaults to None.
-        labels_top (list[str] | None, optional): Labels for the top side of the heatmap. If None, use default labels. If empty list, no labels are used.. Defaults to None.
-        labels_bottom (list[str] | None, optional): Labels for the bottom side of the heatmap. If None, use default labels. If empty list, no labels are used.. Defaults to None.
-        override_heatmap_params (dict, optional): _description_. Defaults to {}.
-        figure_size (tuple, optional): Defaults to (18, 11).
-        title (str, optional): Defaults to "".
-        enable_color_bar (bool, optional): Defaults to False.
-        color_bar_label (str, optional): Color bar label. Defaults to "".
-        colormap (str, optional): _description_. Defaults to "icefire".
-        enable_annotation (bool, optional): _description_. Defaults to True.
-        enable_border (bool, optional): Enable border around the heatmap cells. Defaults to True.
-        border_color (str, optional): Heatmap cell border color. Defaults to "black".
-        border_width (int, optional): Heatmap cell border width. Defaults to 2.
-        annotation_fontsize (int, optional): Heatmap cell annotation fontsize. Defaults to 11.
-        label_fontsize (int, optional): Label fontsize. Defaults to 12.
-        output_path (_type_, optional): Where to output the figure. If None, does not output. Defaults to None.
-        show_fig (bool, optional): Show figure if True, otherwise suppress display. Defaults to True.
-    """
 
     assert input_matrix.ndim == 2, "Method expects a 2D matrix!"
 

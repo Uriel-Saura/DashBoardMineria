@@ -15,7 +15,6 @@ print(f"Dimensiones originales de mat1: {mat1.shape}")
 
 print(mat1[0])  
 
-# Esto elimina la columna en el índice 510 de todas las filas
 if mat1.shape[1] > 510:
     mat1 = np.delete(mat1, 510, axis=1)
     print(f"Dimensiones después de eliminar elemento 510: {mat1.shape}")
